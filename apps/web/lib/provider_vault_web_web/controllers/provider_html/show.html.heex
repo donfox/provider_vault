@@ -1,0 +1,109 @@
+<div class="px-4 py-10 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-4xl">
+    <!-- Back Button -->
+    <div class="mb-6">
+      <a href="/providers" class="btn btn-ghost btn-sm">
+        ← Back to Providers
+      </a>
+    </div>
+
+    <!-- Provider Header -->
+    <div class="bg-base-200 rounded-lg p-8 shadow-lg mb-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <h1 class="text-3xl font-bold mb-2">
+            <%= if @provider.last_name && @provider.first_name do %>
+              <%= @provider.last_name %>, <%= @provider.first_name %>
+              <%= if @provider.credential, do: ", #{@provider.credential}" %>
+            <% else %>
+              <%= @provider.name || "Unknown Provider" %>
+            <% end %>
+          </h1>
+          <div class="flex gap-2 items-center">
+            <span class="badge badge-primary badge-lg">
+              <%= @provider.specialty || "No Specialty" %>
+            </span>
+            <span class="text-sm text-base-content/60">
+              NPI: <%= @provider.npi %>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contact Information -->
+    <div class="bg-base-200 rounded-lg p-6 shadow-lg mb-6">
+      <h2 class="text-xl font-semibold mb-4">Contact Information</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Address -->
+        <div>
+          <h3 class="font-medium text-sm text-base-content/70 mb-1">Address</h3>
+          <%= if @provider.address do %>
+            <p class="text-base"><%= @provider.address %></p>
+            <%= if @provider.city && @provider.state && @provider.zip do %>
+              <p class="text-base">
+                <%= @provider.city %>, <%= @provider.state %> <%= @provider.zip %>
+              </p>
+            <% end %>
+          <% else %>
+            <p class="text-base-content/50">Not available</p>
+          <% end %>
+        </div>
+
+        <!-- Phone -->
+        <div>
+          <h3 class="font-medium text-sm text-base-content/70 mb-1">Phone</h3>
+          <%= if @provider.phone do %>
+            <p class="text-base font-mono"><%= @provider.phone %></p>
+          <% else %>
+            <p class="text-base-content/50">Not available</p>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <!-- Professional Details -->
+    <div class="bg-base-200 rounded-lg p-6 shadow-lg mb-6">
+      <h2 class="text-xl font-semibold mb-4">Professional Details</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- NPI -->
+        <div>
+          <h3 class="font-medium text-sm text-base-content/70 mb-1">National Provider Identifier (NPI)</h3>
+          <p class="text-base font-mono"><%= @provider.npi %></p>
+        </div>
+
+        <!-- Specialty -->
+        <div>
+          <h3 class="font-medium text-sm text-base-content/70 mb-1">Specialty</h3>
+          <%= if @provider.specialty do %>
+            <p class="text-base"><%= @provider.specialty %></p>
+          <% else %>
+            <p class="text-base-content/50">Not specified</p>
+          <% end %>
+        </div>
+
+        <!-- Taxonomy (if available) -->
+        <%= if @provider.taxonomy do %>
+          <div class="md:col-span-2">
+            <h3 class="font-medium text-sm text-base-content/70 mb-1">Taxonomy Code</h3>
+            <p class="text-base font-mono"><%= @provider.taxonomy %></p>
+          </div>
+        <% end %>
+
+        <!-- Credentials -->
+        <%= if @provider.credential do %>
+          <div>
+            <h3 class="font-medium text-sm text-base-content/70 mb-1">Credentials</h3>
+            <p class="text-base"><%= @provider.credential %></p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Timestamps -->
+    <div class="text-sm text-base-content/50 text-center">
+      <p>Record created: <%= Calendar.strftime(@provider.inserted_at, "%B %d, %Y at %I:%M %p") %></p>
+      <p>Last updated: <%= Calendar.strftime(@provider.updated_at, "%B %d, %Y at %I:%M %p") %></p>
+    </div>
+  </div>
+</div>
