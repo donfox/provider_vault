@@ -100,6 +100,39 @@
       </div>
     </div>
 
+<!-- AI-Powered Insights -->
+    <%= if @ai_description || length(@related_specialties) > 0 do %>
+      <div class="bg-base-200 rounded-lg p-6 shadow-lg mb-6">
+        <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
+          <span>🤖</span> AI-Powered Insights
+        </h2>
+        
+        <!-- Specialty Description -->
+        <%= if @ai_description do %>
+          <div class="mb-4">
+            <h3 class="font-medium text-sm text-base-content/70 mb-2">About <%= @provider.specialty %></h3>
+            <p class="text-base leading-relaxed"><%= @ai_description %></p>
+          </div>
+        <% end %>
+        
+        <!-- Related Specialties -->
+        <%= if length(@related_specialties) > 0 do %>
+          <div>
+            <h3 class="font-medium text-sm text-base-content/70 mb-2">Related Specialties</h3>
+            <div class="space-y-3">
+              <%= for related <- @related_specialties do %>
+                <div class="bg-base-100 p-3 rounded">
+                  <div class="font-medium"><%= related["specialty"] %></div>
+                  <div class="text-sm text-base-content/70 mt-1"><%= related["reason"] %></div>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+
     <!-- Timestamps -->
     <div class="text-sm text-base-content/50 text-center">
       <p>Record created: <%= Calendar.strftime(@provider.inserted_at, "%B %d, %Y at %I:%M %p") %></p>

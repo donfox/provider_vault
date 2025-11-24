@@ -46,14 +46,30 @@ defmodule ProviderVaultWebWeb.ProviderController do
   end
 
   def show(conn, %{"npi" => npi}) do
-    case Providers.get_provider(npi) do
-      nil ->
-        conn
-        |> put_flash(:error, "Provider not found")
-        |> redirect(to: "/providers")
+  case Providers.get_provider(npi) do
+    nil ->
+      conn
+      |> put_flash(:error, "Provider not found")
+      |> redirect(to: "/providers")
 
-      provider ->
-        render(conn, :show, provider: provider)
-    end
+    provider ->
+      # Fetch AI description for the specialty
+      ai_description = case ProviderVaultWeb.AIClient.describe_specialty(provider.specialty) do
+        {:ok, description} -> description
+        {:error, _} -> nil
+      end
+
+      # Fetch related specialties
+      related_specialties = case ProviderVaultWeb.AIClient.suggest_related(provider.specialty, 3) do
+        {:ok, specialties} -> specialties
+        {:error, _} -> []
+      end
+
+      render(conn, :show,
+        provider: provider,
+        ai_description: ai_description,
+        related_specialties: related_specialties
+      )
   end
+end
 end
