@@ -1,0 +1,134 @@
+<div class="max-w-4xl mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold mb-8">FAQ Chatbot</h1>
+  
+  <div id="faq-container" class="space-y-4">
+    <!-- Chat messages will appear here -->
+    <div id="chat-messages" class="bg-gray-50 rounded-lg p-4 min-h-[400px] max-h-[600px] overflow-y-auto space-y-2">
+      <div class="text-gray-500 text-center py-8">
+        Ask me anything about our provider network!
+      </div>
+    </div>
+    
+    <!-- Input form -->
+    <form id="faq-form" class="flex gap-2">
+      <input 
+        type="text" 
+        id="question-input" 
+        placeholder="Type your question here..."
+        class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        required
+      />
+      <button 
+        type="submit"
+        class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        Send
+      </button>
+    </form>
+    
+    <!-- Follow-up suggestions -->
+    <div id="suggestions" class="flex flex-wrap gap-2"></div>
+  </div>
+</div>
+
+<script>
+  let conversationHistory = [];
+  
+  const chatMessages = document.getElementById('chat-messages');
+  const faqForm = document.getElementById('faq-form');
+  const questionInput = document.getElementById('question-input');
+  const suggestionsDiv = document.getElementById('suggestions');
+  
+  faqForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const question = questionInput.value.trim();
+    if (!question) return;
+    
+    console.log('Sending question:', question);
+    
+    // Add user message
+    addMessage('user', question);
+    questionInput.value = '';
+    
+    // Show loading
+    const loadingId = addMessage('assistant', 'Thinking...', true);
+    
+    try {
+      const response = await fetch('/faq/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: question,
+          conversation_history: conversationHistory
+        })
+      });
+      
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      // Remove loading message
+      const loadingEl = document.getElementById(loadingId);
+      if (loadingEl) loadingEl.remove();
+      
+      if (data.error) {
+        addMessage('assistant', 'Sorry, I encountered an error: ' + data.error);
+      } else {
+        // Add assistant response
+        addMessage('assistant', data.answer);
+        
+        // Update conversation history
+        conversationHistory = data.conversation_history;
+        
+        // Show follow-up suggestions
+        showSuggestions(data.follow_up_suggestions);
+      }
+    } catch (error) {
+      console.error('Fetch error:', error);
+      const loadingEl = document.getElementById(loadingId);
+      if (loadingEl) loadingEl.remove();
+      addMessage('assistant', 'Sorry, I could not connect to the AI service.');
+    }
+  });
+  
+  function addMessage(role, content, isLoading = false) {
+    const messageId = 'msg-' + Date.now() + '-' + Math.random();
+    const messageDiv = document.createElement('div');
+    messageDiv.id = messageId;
+    messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-2`;
+    
+    const bubble = document.createElement('div');
+    bubble.className = `inline-block px-4 py-2 rounded-lg max-w-[80%] ${
+      role === 'user' 
+        ? 'bg-blue-600 text-white' 
+        : isLoading 
+          ? 'bg-gray-300 text-gray-600 animate-pulse'
+          : 'bg-white border border-gray-300 text-gray-800'
+    }`;
+    bubble.textContent = content;
+    
+    messageDiv.appendChild(bubble);
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    console.log('Added message:', messageId, role, content);
+    
+    return messageId;
+  }
+  
+  function showSuggestions(suggestions) {
+    suggestionsDiv.innerHTML = '';
+    if (!suggestions || suggestions.length === 0) return;
+    
+    suggestions.forEach(suggestion => {
+      const button = document.createElement('button');
+      button.className = 'px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-full border border-gray-300';
+      button.textContent = suggestion;
+      button.onclick = () => {
+        questionInput.value = suggestion;
+        questionInput.focus();
+      };
+      suggestionsDiv.appendChild(button);
+    });
+  }
+</script>

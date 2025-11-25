@@ -20,10 +20,15 @@ defmodule ProviderVaultWebWeb.Router do
     get("/", PageController, :home)
     get("/providers", ProviderController, :index)
     get("/providers/:npi", ProviderController, :show)
+    get("/faq", FAQController, :index)
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", ProviderVaultWebWeb do
-  #   pipe_through :api
-  # end
+  scope "/api", ProviderVaultWebWeb do
+    pipe_through(:api)
+  end
+
+  scope "/faq", ProviderVaultWebWeb do
+    pipe_through(:api)
+    post("/ask", FAQController, :ask)
+  end
 end
