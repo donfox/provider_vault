@@ -223,65 +223,76 @@ def recommend_provider_by_symptoms(symptoms, location_state=None):
         
     Returns:
         dict: {
-            'recommended_specialties': [list of specialty names],
-            'reasoning': str,
+            'recommended_specialties': [list of specialties in priority order],
+            'reasoning': str explaining recommendations,
             'urgency_level': 'low' | 'medium' | 'high' | 'emergency',
-            'disclaimer': str,
-            'available_providers': [list of provider dicts] (if location_state provided)
+            'emergency_action': str or None (instructions if emergency),
+            'disclaimer': str (medical disclaimer),
+            'available_providers': [list of matching providers if location provided]
         }
     """
     
-    prompt = f"""You are a medical triage assistant helping patients understand which type of doctor they should see.
+    prompt = f"""You are a medical triage assistant helping patients find appropriate care.
 
 PATIENT SYMPTOMS: {symptoms}
 
 Your task:
-1. Identify 1-3 appropriate medical specialties for these symptoms (in priority order)
-2. Explain your reasoning in 2-3 sentences
-3. Assess urgency level: low, medium, high, or EMERGENCY
-4. If EMERGENCY (life-threatening symptoms like severe chest pain, difficulty breathing, stroke symptoms), explicitly state "SEEK IMMEDIATE EMERGENCY CARE"
+1. Recommend 2-3 medical specialties that could help (priority order)
+2. Explain your reasoning
+3. Assess urgency level: low, medium, high, or emergency
+4. If emergency, provide specific emergency action
 
-IMPORTANT SAFETY RULES:
-- Never diagnose conditions - only suggest specialties
-- For life-threatening symptoms, always recommend emergency care FIRST
-- Be conservative - when in doubt, recommend higher urgency
-- Include disclaimer that this is not medical advice
+CRITICAL SAFETY RULES:
+- If symptoms suggest life-threatening emergency (heart attack, stroke, severe bleeding, difficulty breathing), 
+  set urgency to "emergency" and tell patient to call 911 immediately
+- Always include appropriate disclaimers
+- Be cautious but helpful
 
 Format your response EXACTLY like this:
 
-SPECIALTIES: [Specialty 1], [Specialty 2], [Specialty 3]
-REASONING: [Your 2-3 sentence explanation]
-URGENCY: [low/medium/high/EMERGENCY]
-EMERGENCY_ACTION: [If EMERGENCY, state "SEEK IMMEDIATE EMERGENCY CARE" otherwise "N/A"]
+SPECIALTIES: [Specialty1], [Specialty2], [Specialty3]
+REASONING: [Brief explanation of why these specialties]
+URGENCY: [low|medium|high|emergency]
+EMERGENCY_ACTION: [Call 911 immediately because... OR N/A if not emergency]
 
-Examples of specialties: Cardiology, Neurology, Orthopedics, Primary Care, Psychiatry, Dermatology, etc."""
+Examples:
+
+Input: "paper cut on finger"
+SPECIALTIES: Primary Care, Urgent Care
+REASONING: Minor wound can be treated by primary care or urgent care for cleaning and possible bandaging.
+URGENCY: low
+EMERGENCY_ACTION: N/A
+
+Input: "crushing chest pain, left arm numbness, shortness of breath"
+SPECIALTIES: Emergency Medicine, Cardiology
+REASONING: These are classic signs of a possible heart attack requiring immediate emergency evaluation.
+URGENCY: emergency
+EMERGENCY_ACTION: Call 911 immediately. Do not drive yourself. These symptoms suggest a possible heart attack."""
 
     try:
         response = client.chat.completions.create(
             model=MODEL,
             messages=[
-                {
-                    "role": "system", 
-                    "content": "You are a careful medical triage assistant. Patient safety is your top priority. Never diagnose - only recommend specialties. Always err on the side of caution."
-                },
+                {"role": "system", "content": "You are a medical triage assistant focused on patient safety and appropriate care routing."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3,
-            max_tokens=400
+            temperature=0.3,  # Low temperature for safety-critical responses
+            max_tokens=300
         )
         
         content = response.choices[0].message.content.strip()
         
+        # Parse structured response
         specialties = []
         reasoning = ""
         urgency = "medium"
-        emergency_action = ""
+        emergency_action = None
         
         for line in content.split('\n'):
             line = line.strip()
             if line.startswith('SPECIALTIES:'):
-                specialty_text = line.replace('SPECIALTIES:', '').strip()
-                specialties = [s.strip() for s in specialty_text.split(',')]
+                spec_text = line.replace('SPECIALTIES:', '').strip()
+                specialties = [s.strip() for s in spec_text.split(',')]
             elif line.startswith('REASONING:'):
                 reasoning = line.replace('REASONING:', '').strip()
             elif line.startswith('URGENCY:'):
@@ -298,6 +309,7 @@ Examples of specialties: Cardiology, Neurology, Orthopedics, Primary Care, Psych
             'available_providers': []
         }
         
+        # Look up providers if location provided
         if location_state and specialties:
             try:
                 primary_specialty = specialties[0]
@@ -344,7 +356,8 @@ def semantic_search_providers(query, limit=10):
             'understood_intent': str,
             'search_terms': [list of extracted terms],
             'recommended_specialties': [list of specialties],
-            'providers': [list of matching providers]
+            'providers': [list of matching providers],
+            'total_found': int
         }
     """
     
@@ -391,6 +404,7 @@ Examples:
         
         content = response.choices[0].message.content.strip()
         
+        # Parse response
         intent = ""
         key_terms = []
         specialties = []
@@ -406,6 +420,7 @@ Examples:
                 spec_text = line.replace('SPECIALTIES:', '').strip()
                 specialties = [s.strip() for s in spec_text.split(',')]
         
+        # Search database for matching providers
         all_matches = []
         
         for specialty in specialties:
@@ -413,8 +428,9 @@ Examples:
                 providers = db_client.get_providers_by_specialty(specialty, limit=20)
                 all_matches.extend(providers)
             except:
-                pass
+                pass  # Skip if specialty not found
         
+        # Deduplicate providers
         seen_npis = set()
         unique_providers = []
         for p in all_matches:
@@ -436,18 +452,195 @@ Examples:
             'understood_intent': '',
             'search_terms': [],
             'recommended_specialties': [],
-            'providers': []
+            'providers': [],
+            'total_found': 0
+        }
+
+
+def faq_chatbot(question, conversation_history=None):
+    """
+    Answer questions about the Provider Vault network using conversational AI.
+    
+    This demonstrates:
+    - Conversational AI with context
+    - RAG (Retrieval Augmented Generation) pattern
+    - Dynamic knowledge retrieval from database
+    - Multi-turn conversation handling
+    
+    Args:
+        question (str): User's question about providers, specialties, or the network
+        conversation_history (list[dict], optional): Previous messages in format:
+            [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+            
+    Returns:
+        dict: {
+            'answer': str (conversational response),
+            'data_retrieved': dict (relevant data from database, if any),
+            'follow_up_suggestions': list[str] (suggested next questions),
+            'conversation_history': list[dict] (updated history for next turn)
+        }
+    """
+    
+    if conversation_history is None:
+        conversation_history = []
+    
+    # Retrieve relevant context from database based on question
+    context_data = {}
+    
+    try:
+        # Get network statistics
+        stats = db_client.test_connection()
+        context_data['network_stats'] = stats
+        
+        # Get specialty list
+        specialties = db_client.get_all_specialties()
+        context_data['available_specialties'] = specialties
+        
+        # Check if question mentions specific specialty
+        question_lower = question.lower()
+        for specialty in specialties:
+            if specialty.lower() in question_lower:
+                # Fetch providers for mentioned specialty
+                providers = db_client.get_providers_by_specialty(specialty, limit=10)
+                context_data['specialty_providers'] = {
+                    'specialty': specialty,
+                    'count': len(providers),
+                    'sample_providers': providers[:3]
+                }
+                break
+        
+        # Get geographic distribution if question mentions location
+        states = ['CA', 'TX', 'NY', 'FL', 'IL', 'PA', 'OH', 'GA', 'NC', 'MI']
+        for state in states:
+            if state.lower() in question_lower or f" {state} " in f" {question_lower} ":
+                state_providers = db_client.get_providers_by_state(state, limit=50)
+                context_data['state_data'] = {
+                    'state': state,
+                    'provider_count': len(state_providers)
+                }
+                break
+                
+    except Exception as e:
+        context_data['error'] = f"Database query error: {str(e)}"
+    
+    # Build system prompt with retrieved context
+    system_prompt = f"""You are a helpful assistant for Provider Vault, a medical provider network.
+
+NETWORK INFORMATION:
+- Total Providers: {context_data.get('network_stats', {}).get('total_providers', 'N/A')}
+- Total Specialties: {context_data.get('network_stats', {}).get('total_specialties', 'N/A')}
+- Coverage States: {context_data.get('network_stats', {}).get('total_states', 'N/A')}
+
+AVAILABLE SPECIALTIES:
+{', '.join(context_data.get('available_specialties', [])[:20])}...
+
+Your role:
+- Answer questions about our provider network
+- Help users find providers by specialty or location
+- Explain what different medical specialties do
+- Provide helpful, accurate information
+- Be conversational and friendly
+- If you don't have specific data, say so honestly
+
+Keep responses concise (2-3 paragraphs max) unless more detail is requested."""
+
+    # Add specialty-specific context if found
+    if 'specialty_providers' in context_data:
+        sp = context_data['specialty_providers']
+        system_prompt += f"\n\nRELEVANT DATA FOR THIS QUESTION:\n"
+        system_prompt += f"We have {sp['count']} {sp['specialty']} providers in our network.\n"
+        if sp['sample_providers']:
+            system_prompt += f"Sample providers: "
+            system_prompt += ", ".join([f"Dr. {p['name']} ({p['city']}, {p['state']})" 
+                                       for p in sp['sample_providers']])
+    
+    if 'state_data' in context_data:
+        sd = context_data['state_data']
+        system_prompt += f"\n\nLOCATION DATA:\n"
+        system_prompt += f"We have {sd['provider_count']} providers in {sd['state']}."
+    
+    # Build messages for API
+    messages = [{"role": "system", "content": system_prompt}]
+    
+    # Add conversation history
+    messages.extend(conversation_history)
+    
+    # Add current question
+    messages.append({"role": "user", "content": question})
+    
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            temperature=0.7,  # Conversational but consistent
+            max_tokens=400
+        )
+        
+        answer = response.choices[0].message.content.strip()
+        
+        # Generate follow-up suggestions
+        follow_up_prompt = f"""Based on this Q&A, suggest 2-3 brief follow-up questions the user might ask.
+
+Question: {question}
+Answer: {answer}
+
+Format as a simple list:
+- Question 1?
+- Question 2?
+- Question 3?"""
+
+        follow_up_response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": "You generate helpful follow-up questions."},
+                {"role": "user", "content": follow_up_prompt}
+            ],
+            temperature=0.6,
+            max_tokens=150
+        )
+        
+        # Parse follow-up suggestions
+        follow_ups = []
+        for line in follow_up_response.choices[0].message.content.strip().split('\n'):
+            line = line.strip()
+            if line and (line.startswith('-') or line.startswith('•')):
+                follow_ups.append(line.lstrip('-• ').strip())
+        
+        # Update conversation history
+        updated_history = conversation_history + [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": answer}
+        ]
+        
+        # Keep only last 10 messages to manage context window
+        if len(updated_history) > 10:
+            updated_history = updated_history[-10:]
+        
+        return {
+            'answer': answer,
+            'data_retrieved': context_data,
+            'follow_up_suggestions': follow_ups[:3],
+            'conversation_history': updated_history
+        }
+        
+    except Exception as e:
+        return {
+            'answer': f"I apologize, but I encountered an error: {str(e)}",
+            'data_retrieved': context_data,
+            'follow_up_suggestions': [],
+            'conversation_history': conversation_history,
+            'error': str(e)
         }
 
 
 # Test function
 if __name__ == "__main__":
     print("🧪 Testing AI Engine Functions\n")
-    print("=" * 60)
+    print("=" * 70)
     
     # Test 1: Specialty Description
     print("\n📝 Test 1: Generate Specialty Description")
-    print("-" * 60)
+    print("-" * 70)
     test_specialty = "Cardiology"
     print(f"Specialty: {test_specialty}\n")
     description = generate_specialty_description(test_specialty)
@@ -455,7 +648,7 @@ if __name__ == "__main__":
     
     # Test 2: Related Specialties
     print("\n\n🔗 Test 2: Suggest Related Specialties")
-    print("-" * 60)
+    print("-" * 70)
     print(f"For specialty: {test_specialty}\n")
     related = suggest_related_specialties(test_specialty, count=3)
     for i, item in enumerate(related, 1):
@@ -464,7 +657,7 @@ if __name__ == "__main__":
     
     # Test 3: Provider Distribution Analysis
     print("\n📊 Test 3: Analyze Provider Distribution")
-    print("-" * 60)
+    print("-" * 70)
     try:
         providers = db_client.get_providers_by_specialty("Cardiology", limit=20)
         if providers:
@@ -476,8 +669,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Could not fetch providers: {e}")
         
-        
-    # Test 4: Symptom-Based Recommendation (NEW!)
+    # Test 4: Symptom-Based Recommendation
     print("\n\n🩺 Test 4: Recommend Provider by Symptoms")
     print("-" * 70)
     test_symptoms = "chest pain, shortness of breath, feeling tired"
@@ -494,7 +686,7 @@ if __name__ == "__main__":
         for i, p in enumerate(recommendation['available_providers'][:3], 1):
             print(f"  {i}. Dr. {p['name']} - {p['city']}, TX")
     
-    # Test 5: Semantic Search (NEW!)
+    # Test 5: Semantic Search
     print("\n\n🔍 Test 5: Semantic Search")
     print("-" * 70)
     test_query = "I need help with my elderly parent's memory problems"
@@ -509,5 +701,26 @@ if __name__ == "__main__":
         for i, p in enumerate(search_results['providers'][:3], 1):
             print(f"  {i}. Dr. {p['name']} - {p['specialty']} ({p['city']}, {p['state']})")
     
+    # Test 6: FAQ Chatbot (NEW!)
+    print("\n\n💬 Test 6: FAQ Chatbot")
+    print("-" * 70)
+    
+    # First question
+    q1 = "How many cardiologists do you have?"
+    print(f"User: {q1}\n")
+    result1 = faq_chatbot(q1)
+    print(f"Assistant: {result1['answer']}\n")
+    if result1['follow_up_suggestions']:
+        print("Suggested follow-ups:")
+        for i, suggestion in enumerate(result1['follow_up_suggestions'], 1):
+            print(f"  {i}. {suggestion}")
+    
+    # Second question with conversation history
+    print("\n" + "-" * 70)
+    q2 = "What about in Texas?"
+    print(f"User: {q2}\n")
+    result2 = faq_chatbot(q2, conversation_history=result1['conversation_history'])
+    print(f"Assistant: {result2['answer']}")
+    
     print("\n" + "=" * 70)
-    print("✅ All 5 tests complete!")
+    print("✅ All 6 tests complete!")

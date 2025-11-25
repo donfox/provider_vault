@@ -109,6 +109,7 @@ def run_interactive_mode():
     print("  analyze <specialty>     - Analyze provider distribution")
     print("  symptoms <description>  - Get provider recommendations based on symptoms")
     print("  search <query>          - Natural language provider search")
+    print("  faq <question>          - Ask FAQ chatbot (with conversation memory)")
     print("  list                    - Show all available specialties")
     print("  stats                   - Show database statistics")
     print("  quit                    - Exit interactive mode")
@@ -119,6 +120,9 @@ def run_interactive_mode():
         all_specialties = db_client.get_all_specialties()
     except:
         all_specialties = []
+    
+    # Conversation history for FAQ
+    faq_history = None
     
     while True:
         try:
@@ -194,9 +198,36 @@ def run_interactive_mode():
                     print("\nTop matches:")
                     for i, p in enumerate(results['providers'][:5], 1):
                         print(f"  {i}. Dr. {p['name']} - {p['specialty']} ({p['city']}, {p['state']})")
+            
+            elif command == "faq":
+                if not arg:
+                    print("Usage: faq <question>")
+                    print("Example: faq How many cardiologists do you have?")
+                    continue
+                print_subheader(f"💬 FAQ Chatbot")
+                result = ai_engine.faq_chatbot(arg, conversation_history=faq_history)
+                print(f"\nAssistant: {result['answer']}")
+                
+                # Update conversation history for next turncle
+                faq_history = result['conversation_history']
+                
+                # Show follow-up suggestions
+                if result['follow_up_suggestions']:
+                    print(f"\n💡 Suggested follow-ups:")
+                    for i, suggestion in enumerate(result['follow_up_suggestions'], 1):
+                        print(f"  {i}. {suggestion}")
+                
+                # Show what data was retrieved (debug info)
+                if result['data_retrieved'].get('specialty_providers'):
+                    sp = result['data_retrieved']['specialty_providers']
+                    print(f"\n📊 [Retrieved: {sp['count']} {sp['specialty']} providers]")
+                elif result['data_retrieved'].get('state_data'):
+                    sd = result['data_retrieved']['state_data']
+                    print(f"\n📊 [Retrieved: {sd['provider_count']} providers in {sd['state']}]")
+            
             else:
                 print(f"Unknown command: {command}")
-                print("Type 'quit' to exit or try: describe, related, analyze, list, stats")
+                print("Type 'quit' to exit or try: describe, related, analyze, symptoms, search, faq, list, stats")
         
         except KeyboardInterrupt:
             print("\n\n👋 Goodbye!")

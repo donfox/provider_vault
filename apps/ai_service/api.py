@@ -78,6 +78,20 @@ class SemanticSearchResponse(BaseModel):
     total_found: int
     providers: List[dict]
 
+class Message(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str
+
+class FAQRequest(BaseModel):
+    question: str = Field(..., example="How many providers do you have in Texas?")
+    conversation_history: Optional[List[Message]] = Field(default=None, example=None)
+
+class FAQResponse(BaseModel):
+    answer: str
+    data_retrieved: dict
+    follow_up_suggestions: List[str]
+    conversation_history: List[dict]
+
 
 # ============================================
 # Health Check Endpoint
@@ -96,7 +110,8 @@ def root():
             "/api/specialty/related",
             "/api/providers/analyze",
             "/api/symptoms/recommend",
-            "/api/search"
+            "/api/search",
+            "/api/faq"
         ]
     }
 
@@ -247,6 +262,38 @@ def semantic_search(request: SemanticSearchRequest):
             "query": request.query,
             **results
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/faq", response_model=FAQResponse)
+def faq_chatbot(request: FAQRequest):
+    """
+    FAQ chatbot for conversational questions about the provider network.
+    
+    Supports multi-turn conversations with context maintenance.
+    
+    Examples:
+    - "How many cardiologists do you have?"
+    - "What specialties are available?"
+    - "Do you have any providers in Texas?"
+    
+    Returns:
+    - answer: Conversational response to the question
+    - data_retrieved: Relevant database information used
+    - follow_up_suggestions: Suggested next questions
+    - conversation_history: Updated history for next turn
+    """
+    try:
+        # Convert Pydantic models to dicts for ai_engine
+        history = None
+        if request.conversation_history:
+            history = [{"role": msg.role, "content": msg.content} 
+                      for msg in request.conversation_history]
+        
+        result = ai_engine.faq_chatbot(request.question, history)
+        
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
