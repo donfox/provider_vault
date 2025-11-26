@@ -107,7 +107,7 @@
     noResults.classList.add('hidden');
     
     try {
-      const response = await fetch(`/search/query?q=${encodeURIComponent(query)}&limit=20`);
+      const response = await fetch("/api/search/query?q=" + encodeURIComponent(query) + "&limit=20");
       const data = await response.json();
       
       if (data.error) {

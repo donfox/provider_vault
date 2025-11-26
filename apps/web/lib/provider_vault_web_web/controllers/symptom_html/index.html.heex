@@ -139,7 +139,7 @@
     providersSection.classList.add('hidden');
     
     try {
-      const response = await fetch('/symptoms/search', {
+      const response = await fetch('/api/symptoms/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
