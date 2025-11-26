@@ -21,6 +21,8 @@ defmodule ProviderVaultWebWeb.Router do
     get("/providers", ProviderController, :index)
     get("/providers/:npi", ProviderController, :show)
     get("/faq", FAQController, :index)
+    get("/symptoms", SymptomController, :index)
+    get("/search", SearchController, :index)
   end
 
   scope "/api", ProviderVaultWebWeb do
@@ -30,5 +32,15 @@ defmodule ProviderVaultWebWeb.Router do
   scope "/faq", ProviderVaultWebWeb do
     pipe_through(:api)
     post("/ask", FAQController, :ask)
+  end
+
+  scope "/symptoms", ProviderVaultWebWeb do
+    pipe_through(:api)
+    post("/search", SymptomController, :search)
+  end
+
+  scope "/search", ProviderVaultWebWeb do
+    pipe_through(:api)
+    get("/query", SearchController, :query)
   end
 end

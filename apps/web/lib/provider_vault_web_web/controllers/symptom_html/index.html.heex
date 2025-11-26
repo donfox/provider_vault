@@ -1,0 +1,237 @@
+<div class="max-w-4xl mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold mb-4 text-white">Symptom Search</h1>
+  <p class="text-gray-300 mb-8">Describe your symptoms and we'll recommend appropriate medical specialists.</p>
+  
+  <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
+    <p class="text-sm text-yellow-700">
+      ⚠️ <strong>Important:</strong> This is not medical advice. Always consult with a qualified healthcare provider for proper diagnosis and treatment.
+    </p>
+  </div>
+
+  <!-- Search Form -->
+  <div id="search-form-container" class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <form id="symptom-form" class="space-y-4">
+      <div>
+        <label for="symptoms" class="block text-sm font-medium text-gray-700 mb-2">
+          Describe your symptoms
+        </label>
+        <textarea 
+          id="symptoms"
+          name="symptoms"
+          rows="4"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+          placeholder="Example: chest pain, shortness of breath, feeling tired"
+          required
+        ></textarea>
+      </div>
+
+      <div>
+        <label for="location" class="block text-sm font-medium text-gray-700 mb-2">
+          Your state (optional - to find available providers)
+        </label>
+        <select 
+          id="location"
+          name="location_state"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+        >
+          <option value="">Select a state...</option>
+          <option value="CA">California</option>
+          <option value="TX">Texas</option>
+          <option value="NY">New York</option>
+          <option value="FL">Florida</option>
+          <option value="IL">Illinois</option>
+          <option value="PA">Pennsylvania</option>
+          <option value="OH">Ohio</option>
+          <option value="GA">Georgia</option>
+          <option value="NC">North Carolina</option>
+          <option value="MI">Michigan</option>
+        </select>
+      </div>
+
+      <button 
+        type="submit"
+        class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+      >
+        Find Specialists
+      </button>
+    </form>
+  </div>
+
+  <!-- Results Container -->
+  <div id="results" class="hidden">
+    <!-- Emergency Alert -->
+    <div id="emergency-alert" class="hidden bg-red-100 border-l-4 border-red-500 p-4 mb-6">
+      <div class="flex items-start">
+        <div class="flex-shrink-0">
+          <svg class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-lg font-bold text-red-800 mb-2">⚠️ EMERGENCY - CALL 911 IMMEDIATELY</h3>
+          <p id="emergency-action" class="text-red-700"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold text-gray-800">Recommendations</h2>
+        <span id="urgency-badge" class="px-3 py-1 rounded-full text-sm font-medium"></span>
+      </div>
+
+      <div class="mb-6">
+        <h3 class="text-lg font-semibold text-gray-700 mb-2">Recommended Specialists:</h3>
+        <ul id="specialties-list" class="list-disc list-inside space-y-1 text-gray-800"></ul>
+      </div>
+
+      <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+        <h3 class="text-sm font-semibold text-gray-700 mb-2">Why these specialists?</h3>
+        <p id="reasoning" class="text-gray-700"></p>
+      </div>
+
+      <!-- Available Providers -->
+      <div id="providers-section" class="hidden">
+        <h3 class="text-lg font-semibold text-gray-700 mb-3">Available Providers in <span id="provider-state"></span>:</h3>
+        <div id="providers-list" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <!-- New Search Button -->
+    <button 
+      id="new-search-btn"
+      class="w-full bg-gray-600 text-white py-3 px-6 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 font-medium"
+    >
+      New Search
+    </button>
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById('symptom-form');
+  const formContainer = document.getElementById('search-form-container');
+  const resultsDiv = document.getElementById('results');
+  const emergencyAlert = document.getElementById('emergency-alert');
+  const emergencyAction = document.getElementById('emergency-action');
+  const urgencyBadge = document.getElementById('urgency-badge');
+  const specialtiesList = document.getElementById('specialties-list');
+  const reasoning = document.getElementById('reasoning');
+  const providersSection = document.getElementById('providers-section');
+  const providersList = document.getElementById('providers-list');
+  const providerState = document.getElementById('provider-state');
+  const newSearchBtn = document.getElementById('new-search-btn');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const symptoms = document.getElementById('symptoms').value;
+    const location = document.getElementById('location').value;
+    
+    console.log('Submitting symptoms:', symptoms);
+    
+    // Hide form, show loading
+    formContainer.classList.add('hidden');
+    resultsDiv.classList.remove('hidden');
+    emergencyAlert.classList.add('hidden');
+    specialtiesList.innerHTML = '<li class="text-gray-500">Analyzing symptoms...</li>';
+    reasoning.textContent = 'Processing...';
+    providersSection.classList.add('hidden');
+    
+    try {
+      const response = await fetch('/symptoms/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symptoms: symptoms,
+          location_state: location || null
+        })
+      });
+      
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      if (data.error) {
+        alert('Error: ' + data.error);
+        formContainer.classList.remove('hidden');
+        resultsDiv.classList.add('hidden');
+        return;
+      }
+      
+      displayResults(data);
+      
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Failed to connect to AI service. Please make sure it is running.');
+      formContainer.classList.remove('hidden');
+      resultsDiv.classList.add('hidden');
+    }
+  });
+
+  newSearchBtn.addEventListener('click', () => {
+    // Clear form
+    document.getElementById('symptoms').value = '';
+    document.getElementById('location').value = '';
+    
+    // Show form, hide results
+    formContainer.classList.remove('hidden');
+    resultsDiv.classList.add('hidden');
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  
+  function displayResults(data) {
+    // Show emergency alert if needed
+    if (data.urgency_level === 'emergency' && data.emergency_action) {
+      emergencyAlert.classList.remove('hidden');
+      emergencyAction.textContent = data.emergency_action;
+    } else {
+      emergencyAlert.classList.add('hidden');
+    }
+    
+    // Set urgency badge
+    const urgencyColors = {
+      'low': 'bg-green-100 text-green-800',
+      'medium': 'bg-yellow-100 text-yellow-800',
+      'high': 'bg-orange-100 text-orange-800',
+      'emergency': 'bg-red-100 text-red-800'
+    };
+    
+    urgencyBadge.className = `px-3 py-1 rounded-full text-sm font-medium ${urgencyColors[data.urgency_level] || urgencyColors.medium}`;
+    urgencyBadge.textContent = `Urgency: ${data.urgency_level.toUpperCase()}`;
+    
+    // Display recommended specialties
+    specialtiesList.innerHTML = '';
+    data.recommended_specialties.forEach(specialty => {
+      const li = document.createElement('li');
+      li.className = 'text-gray-800';
+      li.textContent = specialty;
+      specialtiesList.appendChild(li);
+    });
+    
+    // Display reasoning
+    reasoning.textContent = data.reasoning;
+    
+    // Display available providers if any
+    if (data.available_providers && data.available_providers.length > 0) {
+      providersSection.classList.remove('hidden');
+      providerState.textContent = data.location_checked;
+      
+      providersList.innerHTML = '';
+      data.available_providers.forEach(provider => {
+        const div = document.createElement('div');
+        div.className = 'p-3 bg-gray-50 rounded border border-gray-200';
+        div.innerHTML = `
+          <div class="font-medium text-gray-900">Dr. ${provider.name}</div>
+          <div class="text-sm text-gray-600">${provider.specialty}</div>
+          <div class="text-sm text-gray-500">${provider.city}, ${provider.state}</div>
+        `;
+        providersList.appendChild(div);
+      });
+    } else {
+      providersSection.classList.add('hidden');
+    }
+  }
+</script>

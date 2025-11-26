@@ -31,6 +31,25 @@
     </script>
   </head>
   <body>
+    <!-- Navigation -->
+    <nav class="bg-gray-800 text-white shadow-lg">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+          <div class="flex items-center">
+            <a href="/" class="text-xl font-bold">Provider Vault</a>
+            <div class="ml-10 flex items-baseline space-x-4">
+              <a href="/" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700">Home</a>
+              <a href="/providers" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700">Providers</a>
+              <a href="/search" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700">Search</a>
+              <a href="/symptoms" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700">Symptoms</a>
+              <a href="/faq" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700">FAQ</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
     {@inner_content}
   </body>
 </html>
